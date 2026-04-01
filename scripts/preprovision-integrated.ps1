@@ -307,7 +307,8 @@ function Format-AzDeploymentError {
     }
 }
 
-$compiledParent = Join-Path $env:TEMP ("parent.$deploymentName.parameters.json")
+$tempDir = if ($env:TEMP) { $env:TEMP } elseif ($env:TMPDIR) { $env:TMPDIR } else { '/tmp' }
+$compiledParent = Join-Path $tempDir ("parent.$deploymentName.parameters.json")
 
 & az bicep build-params --file $parentParamsFile --outfile $compiledParent | Out-Null
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $compiledParent)) {
@@ -357,7 +358,7 @@ foreach ($name in $allowedParamNames) {
     }
 }
 
-$filteredParams = Join-Path $env:TEMP ("ai-landing-zone.$deploymentName.parameters.json")
+$filteredParams = Join-Path $tempDir ("ai-landing-zone.$deploymentName.parameters.json")
 $filtered | ConvertTo-Json -Depth 50 | Set-Content -Path $filteredParams -Encoding UTF8
 
 $deployOutput = $null

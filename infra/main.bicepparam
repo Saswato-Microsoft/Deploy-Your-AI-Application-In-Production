@@ -7,8 +7,9 @@ using './main.bicep'
 param environmentName = readEnvironmentVariable('AZURE_ENV_NAME', '')
 param location = readEnvironmentVariable('AZURE_LOCATION', '')
 param cosmosLocation = readEnvironmentVariable('AZURE_COSMOS_LOCATION', '')
-// Entra object ID of the identity to grant RBAC (user, group, service principal, or UAI). Set this if Graph lookup is blocked.
-param principalId = ''
+// Entra object ID of the identity to grant RBAC (user, group, service principal, or UAI).
+// Resolved automatically by the preprovision script from the logged-in Azure identity.
+param principalId = readEnvironmentVariable('AZURE_PRINCIPAL_ID', '')
 param principalType = 'User'
 
 // ========================================

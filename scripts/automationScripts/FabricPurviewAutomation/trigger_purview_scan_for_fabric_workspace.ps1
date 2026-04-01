@@ -182,12 +182,32 @@ Clear-SensitiveVariables -VariableNames @("accessToken", "fabricToken", "purview
 exit 0
 }
 
-# Determine Purview collection ID for domain assignment
+# Determine Purview collection ID for scan assignment.
+# The scan must use the same collection as the datasource, otherwise the Purview
+# API returns Scan_CollectionOutOfBound. Query the datasource to resolve its
+# collection, falling back to the collection created during earlier stages.
 $collectionId = $null
-$collectionEnvPath = Join-Path $tempDir 'purview_collection.env'
-if (Test-Path $collectionEnvPath) {
-  Get-Content $collectionEnvPath | ForEach-Object {
-    if ($_ -match '^PURVIEW_COLLECTION_ID=(.*)$') { $collectionId = $Matches[1].Trim() }
+
+# Look up the datasource's actual collection from the Purview API
+try {
+  $dsUrl = "$endpoint/scan/datasources/${datasourceName}?api-version=2022-07-01-preview"
+  $dsHeaders = New-SecureHeaders -Token $purviewToken -AdditionalHeaders @{'Content-Type' = 'application/json'}
+  $dsResp = Invoke-RestMethod -Uri $dsUrl -Headers $dsHeaders -Method Get -ErrorAction Stop
+  if ($dsResp -and $dsResp.properties -and $dsResp.properties.collection -and $dsResp.properties.collection.referenceName) {
+    $collectionId = $dsResp.properties.collection.referenceName
+    Log "Resolved datasource collection from Purview API: $collectionId"
+  }
+} catch {
+  Warn "Could not query datasource collection from API: $($_.Exception.Message)"
+}
+
+# Fall back to the collection saved during the collection-creation stage
+if (-not $collectionId) {
+  $collectionEnvPath = Join-Path $tempDir 'purview_collection.env'
+  if (Test-Path $collectionEnvPath) {
+    Get-Content $collectionEnvPath | ForEach-Object {
+      if ($_ -match '^PURVIEW_COLLECTION_ID=(.*)$') { $collectionId = $Matches[1].Trim() }
+    }
   }
 }
 if (-not $collectionId) {
