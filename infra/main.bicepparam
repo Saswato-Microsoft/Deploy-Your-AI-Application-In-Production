@@ -85,7 +85,7 @@ param deployAiFoundry = true
 param deployAiFoundrySubnet = false
 param deployAppConfig = true
 param deployKeyVault = true
-param deployVmKeyVault = readEnvironmentVariable('DEPLOY_VM_KEY_VAULT', 'true') == 'false'
+param deployVmKeyVault = readEnvironmentVariable('DEPLOY_VM_KEY_VAULT', 'true') == 'true'
 param deployLogAnalytics = false
 param deployAppInsights = true
 param deploySearchService = true

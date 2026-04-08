@@ -194,6 +194,15 @@ if ([string]::IsNullOrWhiteSpace($Location) -or [string]::IsNullOrWhiteSpace($Re
     exit 1
 }
 
+# Generate VM admin password if not provided (ensures the VM gets a valid password
+# that meets Azure complexity requirements and the same value is stored in Key Vault).
+if ([string]::IsNullOrWhiteSpace($env:VM_ADMIN_PASSWORD)) {
+    $guid = [System.Guid]::NewGuid().ToString('N')
+    $env:VM_ADMIN_PASSWORD = "Vm!$guid"
+    try { & azd env set VM_ADMIN_PASSWORD $env:VM_ADMIN_PASSWORD 2>$null | Out-Null } catch { }
+    Write-Host "[i] VM_ADMIN_PASSWORD not set; generated and stored in azd env." -ForegroundColor Yellow
+}
+
 # Navigate to AI Landing Zone submodule
 $aiLandingZonePath = Join-Path $PSScriptRoot ".." "submodules" "ai-landing-zone"
 

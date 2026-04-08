@@ -452,6 +452,28 @@ resource postgreSqlAdminSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = 
   }
 }
 
+// ========================================
+// VM CREDENTIALS - KEY VAULT SECRETS
+// ========================================
+
+var effectiveVmUserName = !empty(vmUserName) ? vmUserName : 'testvmuser'
+
+resource vmAdminPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (deployVM && deployVmKeyVault) {
+  name: 'vm-admin-password'
+  parent: keyVault
+  properties: {
+    value: vmAdminPassword
+  }
+}
+
+resource vmAdminUsernameSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (deployVM && deployVmKeyVault) {
+  name: 'vm-admin-username'
+  parent: keyVault
+  properties: {
+    value: effectiveVmUserName
+  }
+}
+
 module fabricCapacity 'modules/fabric-capacity.bicep' = if (effectiveFabricCapacityMode == 'create') {
   name: 'fabric-capacity'
   params: {
@@ -516,6 +538,10 @@ output postgreSqlFabricUserSecretNameOut string = deployPostgreSql && enablePost
 output postgreSqlMirrorConnectionModeOut string = deployPostgreSql ? postgreSqlMirrorConnectionMode : ''
 output postgreSqlMirrorConnectionUserNameOut string = deployPostgreSql ? (postgreSqlMirrorConnectionMode == 'admin' ? postgreSqlAdminLogin : postgreSqlFabricUserName) : ''
 output postgreSqlMirrorConnectionSecretNameOut string = deployPostgreSql && enablePostgreSqlKeyVaultSecret ? (postgreSqlMirrorConnectionMode == 'admin' ? postgreSqlAdminSecretName : postgreSqlFabricUserSecretName) : ''
+
+// VM credential outputs
+output vmAdminPasswordSecretName string = deployVM && deployVmKeyVault ? 'vm-admin-password' : ''
+output vmAdminUsernameSecretName string = deployVM && deployVmKeyVault ? 'vm-admin-username' : ''
 
 var effectiveFabricWorkspaceName = effectiveFabricWorkspaceMode == 'byo'
   ? (!empty(fabricWorkspaceName) ? fabricWorkspaceName : (!empty(environmentName) ? 'workspace-${environmentName}' : 'workspace-${baseName}'))
