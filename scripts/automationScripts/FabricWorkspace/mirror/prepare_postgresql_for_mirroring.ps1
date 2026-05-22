@@ -39,9 +39,23 @@ function Ensure-AzExtension([string]$name) {
     return $true
   }
 
-  Warn "Azure CLI extension '$name' is required but not installed."
-  Warn "Install: az extension add --name $name"
-  Warn "If install fails: & \"C:\Program Files\Microsoft SDKs\Azure\CLI2\python.exe\" -m pip install --upgrade pip setuptools wheel"
+  Log "Azure CLI extension '$name' is required but not installed. Installing automatically..."
+  try {
+    & az extension add --name $name --only-show-errors --yes 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+      # Verify it now resolves
+      $null = & az extension show --name $name 2>$null
+      if ($LASTEXITCODE -eq 0) {
+        Log "Azure CLI extension '$name' installed successfully."
+        return $true
+      }
+    }
+  } catch {
+    Warn "Failed to install Azure CLI extension '$name': $($_.Exception.Message)"
+  }
+
+  Warn "Azure CLI extension '$name' is required but could not be installed automatically."
+  Warn "Install manually: az extension add --name $name"
   return $false
 }
 
@@ -162,11 +176,35 @@ function Ensure-Psql([bool]$allowInstall) {
     return $false
   }
 
-  Warn "psql not found. Attempting to install PostgreSQL client tools via winget..."
+  Warn "psql not found. Attempting to install PostgreSQL client tools..."
   try {
-    & winget install --id PostgreSQL.PostgreSQL.16 -e --source winget --accept-package-agreements --accept-source-agreements 1>$null
+    if ($IsWindows) {
+      & winget install --id PostgreSQL.PostgreSQL.16 -e --source winget --accept-package-agreements --accept-source-agreements 1>$null
+    } elseif ($IsLinux) {
+      if (Get-Command apt-get -ErrorAction SilentlyContinue) {
+        $sudo = if ((id -u) -ne 0) { 'sudo' } else { '' }
+        & bash -c "$sudo apt-get update -y && $sudo apt-get install -y postgresql-client" 1>$null
+      } elseif (Get-Command dnf -ErrorAction SilentlyContinue) {
+        & bash -c "sudo dnf install -y postgresql" 1>$null
+      } elseif (Get-Command yum -ErrorAction SilentlyContinue) {
+        & bash -c "sudo yum install -y postgresql" 1>$null
+      } else {
+        Warn "No supported package manager found to install psql on this Linux distribution."
+        return $false
+      }
+    } elseif ($IsMacOS) {
+      if (Get-Command brew -ErrorAction SilentlyContinue) {
+        & brew install libpq 1>$null
+      } else {
+        Warn "Homebrew not available; cannot install psql on macOS automatically."
+        return $false
+      }
+    } else {
+      Warn "Unsupported OS for automatic psql installation."
+      return $false
+    }
   } catch {
-    Warn "winget failed to install PostgreSQL client tools."
+    Warn "Failed to install PostgreSQL client tools: $($_.Exception.Message)"
     return $false
   }
 
@@ -183,8 +221,21 @@ function Ensure-Npgsql() {
     return $false
   }
 
+  # Determine a cache root that works cross-platform. $env:LOCALAPPDATA is
+  # only defined on Windows; fall back to ~/.local/share on Linux/macOS.
+  $cacheBase = $env:LOCALAPPDATA
+  if (-not $cacheBase) {
+    $cacheBase = if ($env:XDG_DATA_HOME) { $env:XDG_DATA_HOME } elseif ($env:HOME) { Join-Path $env:HOME '.local/share' } else { [System.IO.Path]::GetTempPath() }
+  }
+
+  # Portable Npgsql restore relies on nuget.exe, which only runs on Windows.
+  if (-not $IsWindows) {
+    Warn "Portable Npgsql fallback (nuget.exe-based) is only supported on Windows."
+    return $false
+  }
+
   try {
-    $cacheRoot = Join-Path $env:LOCALAPPDATA "DeployYourAIApplicationInProduction\tools\npgsql\$($script:NpgsqlPackageVersion)"
+    $cacheRoot = Join-Path $cacheBase "DeployYourAIApplicationInProduction/tools/npgsql/$($script:NpgsqlPackageVersion)"
     $nugetExe = Join-Path $cacheRoot 'nuget.exe'
     $restoreMarker = Join-Path $cacheRoot '.restored'
 
