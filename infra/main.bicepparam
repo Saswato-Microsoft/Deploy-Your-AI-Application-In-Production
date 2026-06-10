@@ -228,7 +228,7 @@ param containerAppsList = [
   }
 ]
 
-// Jumpbox sign-in is performed via Microsoft Entra ID through Azure Bastion (Basic SKU).
+// Jumpbox sign-in is performed via Microsoft Entra ID through Azure Bastion (Standard SKU).
 // Windows still requires a local admin account at provisioning time, but it is NOT used
 // for sign-in. The username is fixed to a default and the password is generated
 // deterministically per azd environment so nothing weak/known is committed to source.
